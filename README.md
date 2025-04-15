@@ -2,6 +2,8 @@
 
 *The result of me trying out Cline and Cursor one random day, to make macOS a little bit more suitable for being used with a mouse. In true vibe coding fashion, I didn't actually read the code (much), there may be bugs and other nonsense, no guarantees (that includes the rest of this README). What I can confirm is that the extension doesn't contact any servers (unless you count the fact that its settings use the [sync storage](https://developer.chrome.com/docs/extensions/reference/api/storage#property-sync)) and doesn't send any data anywhere (which is pretty important for something that injects a bit of JS into every page).*
 
+![demo](/demo.webp)
+
 A Chrome/Edge extension that brings Windows-style auto-scroll functionality to macOS/Linux browsers. This extension allows you to scroll web pages by pressing the middle mouse button and moving the cursor, similar to the auto-scroll feature available in Windows.
 
 ## Usage
