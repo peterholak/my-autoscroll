@@ -23,10 +23,13 @@ export class AutoScrollCircle {
     this.overlay.style.left = '0';
     this.overlay.style.width = '100%';
     this.overlay.style.height = '100%';
-    this.overlay.style.zIndex = '999998';
+    this.overlay.style.zIndex = '999998'; // Below circle (999999), above page content
     this.overlay.style.display = 'none';
+    // The overlay intentionally doesn't set background or pointer-events,
+    // effectively capturing all mouse events while it's displayed.
     
-    // Add both elements to the document
+    // Add both elements to the document body, ready to be shown.
+    // Appending them here ensures they are part of the DOM early.
     document.body.appendChild(this.overlay);
     document.body.appendChild(this.element);
   }
@@ -45,10 +48,11 @@ export class AutoScrollCircle {
     style.border = '1px solid #999';
     style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.2)';
     style.zIndex = '999999';
-    style.pointerEvents = 'none'; // Allow clicks to pass through
-    style.transform = 'translate(-50%, -50%)'; // Center the circle on the cursor
+    style.pointerEvents = 'none'; // Allow clicks/events to pass through the circle itself to the overlay
+    style.transform = 'translate(-50%, -50%)'; // Center the circle visually on its coordinates
     
-    // Add the inner elements (arrows and center dot)
+    // Add the inner elements (arrows and center dot) using inline styles.
+    // While CSS classes could be used, inline styles prevent conflicts with host page styles.
     this.element.innerHTML = `
       <div style="
         position: absolute;
@@ -115,49 +119,46 @@ export class AutoScrollCircle {
     this.centerX = x;
     this.centerY = y;
     
-    // Position the circle
+    // Position the circle element using its top-left corner
     this.element.style.left = `${x}px`;
     this.element.style.top = `${y}px`;
     
-    // Make sure the circle is visible
+    // Make the circle element visible
     this.element.style.display = 'block';
+    // NOTE: Explicitly setting visibility/opacity might be redundant if display:block is sufficient,
+    // but ensures visibility in edge cases or if other styles interfere.
     this.element.style.visibility = 'visible';
     this.element.style.opacity = '1';
     
-    // Show the overlay
+    // Show the overlay to capture mouse events
     this.overlay.style.display = 'block';
     
+    // Ensure elements are in the DOM (might have been removed or failed initial append)
     try {
-      // Add to the DOM if not already there
+      // Add overlay first if not present
+      if (!this.overlay.parentElement) {
+         debugLog('Appending overlay to document body');
+         document.body?.appendChild(this.overlay);
+      }
+      // Add circle if not present
       if (!this.element.parentElement) {
         debugLog('Appending circle to document body');
-        
-        // Make sure document.body exists
-        if (document.body) {
-          document.body.appendChild(this.element);
-        } else {
-          debugLog('document.body is not available');
-          
-          // Try to append to document.documentElement as fallback
-          if (document.documentElement) {
-            document.documentElement.appendChild(this.element);
-            debugLog('Appended to documentElement instead');
-          } else {
-            debugLog('Cannot append circle to DOM, no valid parent element');
-          }
-        }
+        // Use optional chaining for safety
+        document.body?.appendChild(this.element);
       }
     } catch (error) {
-      debugLog('Error showing circle:', error);
+      // Log errors, but don't crash the extension
+      console.error('Error ensuring circle/overlay in DOM:', error);
     }
   }
   
   /**
-   * Hide and remove the circle
+   * Hide and remove the circle and overlay
    */
   public hide(): void {
+    debugLog('Hiding circle and overlay');
     try {
-      // Hide both elements
+      // Hide both elements. We don't remove them from DOM, just hide.
       this.element.style.display = 'none';
       this.overlay.style.display = 'none';
     } catch (error) {

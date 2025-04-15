@@ -1,40 +1,75 @@
 import { AutoScrollOptions, defaultOptions } from '../utils/types';
 
-// DOM elements
-const speedMultiplierInput = document.getElementById('speedMultiplier') as HTMLInputElement;
-const speedMultiplierValue = document.getElementById('speedMultiplierValue') as HTMLDivElement;
-const baseSpeedInput = document.getElementById('baseSpeed') as HTMLInputElement;
-const baseSpeedValue = document.getElementById('baseSpeedValue') as HTMLDivElement;
-const minDistanceInput = document.getElementById('minDistance') as HTMLInputElement;
-const minDistanceValue = document.getElementById('minDistanceValue') as HTMLDivElement;
-const maxDistanceInput = document.getElementById('maxDistance') as HTMLInputElement;
-const maxDistanceValue = document.getElementById('maxDistanceValue') as HTMLDivElement;
-const clickDeadZoneInput = document.getElementById('clickDeadZone') as HTMLInputElement;
-const clickDeadZoneValue = document.getElementById('clickDeadZoneValue') as HTMLDivElement;
-const debugModeCheckbox = document.getElementById('debugMode') as HTMLInputElement;
-const saveButton = document.getElementById('saveButton') as HTMLButtonElement;
-const statusElement = document.getElementById('status') as HTMLDivElement;
-const speedExponentInput = document.getElementById('speedExponent') as HTMLInputElement;
-const speedExponentValue = document.getElementById('speedExponentValue') as HTMLDivElement;
+// Constants for storage keys (optional but good practice)
+const OPTION_KEYS = {
+  SPEED_MULTIPLIER: 'speedMultiplier',
+  BASE_SPEED: 'baseSpeed',
+  MIN_DISTANCE: 'minDistance',
+  MAX_DISTANCE: 'maxDistance',
+  CLICK_DEAD_ZONE: 'clickDeadZone',
+  SPEED_EXPONENT: 'speedExponent',
+  DEBUG_MODE: 'debugMode'
+};
 
-// Update displayed value when slider changes
-function updateDisplayedValue(input: HTMLInputElement, valueElement: HTMLDivElement): void {
-  valueElement.textContent = input.value;
+// Helper to safely get DOM elements
+function getElement<T extends HTMLElement>(id: string, type: new () => T): T | null {
+  const element = document.getElementById(id);
+  if (!element) {
+    console.error(`Element with ID '${id}' not found.`);
+    return null;
+  }
+  if (!(element instanceof type)) {
+     console.error(`Element with ID '${id}' is not of type ${type.name}.`);
+     return null;
+  }
+  return element as T;
 }
 
-// Load saved options
+// DOM elements - Use helper for safer retrieval
+const speedMultiplierInput = getElement('speedMultiplier', HTMLInputElement);
+const speedMultiplierValue = getElement('speedMultiplierValue', HTMLDivElement);
+const baseSpeedInput = getElement('baseSpeed', HTMLInputElement);
+const baseSpeedValue = getElement('baseSpeedValue', HTMLDivElement);
+const minDistanceInput = getElement('minDistance', HTMLInputElement);
+const minDistanceValue = getElement('minDistanceValue', HTMLDivElement);
+const maxDistanceInput = getElement('maxDistance', HTMLInputElement);
+const maxDistanceValue = getElement('maxDistanceValue', HTMLDivElement);
+const clickDeadZoneInput = getElement('clickDeadZone', HTMLInputElement);
+const clickDeadZoneValue = getElement('clickDeadZoneValue', HTMLDivElement);
+const debugModeCheckbox = getElement('debugMode', HTMLInputElement);
+const saveButton = getElement('saveButton', HTMLButtonElement);
+const statusElement = getElement('status', HTMLDivElement);
+const speedExponentInput = getElement('speedExponent', HTMLInputElement);
+const speedExponentValue = getElement('speedExponentValue', HTMLDivElement);
+
+/**
+ * Updates the text content of a display element when an input slider changes.
+ * @param input The input element (e.g., range slider).
+ * @param valueElement The element displaying the input's value.
+ */
+function updateDisplayedValue(input: HTMLInputElement | null, valueElement: HTMLDivElement | null): void {
+  if (input && valueElement) {
+     valueElement.textContent = input.value;
+  }
+}
+
+/**
+ * Loads options from chrome.storage.sync and populates the form fields.
+ */
 function loadOptions(): void {
   chrome.storage.sync.get(defaultOptions, (items) => {
-    const options = items as AutoScrollOptions;
-    speedMultiplierInput.value = options.speedMultiplier.toString();
-    baseSpeedInput.value = options.baseSpeed.toString();
-    minDistanceInput.value = options.minDistance.toString();
-    maxDistanceInput.value = options.maxDistance.toString();
-    clickDeadZoneInput.value = options.clickDeadZone.toString();
-    speedExponentInput.value = options.speedExponent.toString();
-    debugModeCheckbox.checked = options.debugMode;
-    
-    // Update displayed values
+    const options = items as AutoScrollOptions; // Assume storage structure matches default
+
+    // Populate inputs only if they exist
+    if (speedMultiplierInput) speedMultiplierInput.value = options.speedMultiplier.toString();
+    if (baseSpeedInput) baseSpeedInput.value = options.baseSpeed.toString();
+    if (minDistanceInput) minDistanceInput.value = options.minDistance.toString();
+    if (maxDistanceInput) maxDistanceInput.value = options.maxDistance.toString();
+    if (clickDeadZoneInput) clickDeadZoneInput.value = options.clickDeadZone.toString();
+    if (speedExponentInput) speedExponentInput.value = options.speedExponent.toString();
+    if (debugModeCheckbox) debugModeCheckbox.checked = options.debugMode;
+
+    // Update displayed values (handles null checks internally)
     updateDisplayedValue(speedMultiplierInput, speedMultiplierValue);
     updateDisplayedValue(baseSpeedInput, baseSpeedValue);
     updateDisplayedValue(minDistanceInput, minDistanceValue);
@@ -44,43 +79,59 @@ function loadOptions(): void {
   });
 }
 
-// Save options to chrome.storage.sync
+/**
+ * Saves the current form values to chrome.storage.sync.
+ */
 function saveOptions(): void {
+  // Ensure all necessary elements exist before saving
+  if (!speedMultiplierInput || !baseSpeedInput || !minDistanceInput || !maxDistanceInput || 
+      !clickDeadZoneInput || !speedExponentInput || !debugModeCheckbox || !statusElement) {
+    console.error("One or more option elements are missing. Cannot save.");
+    if (statusElement) statusElement.textContent = 'Error: Missing form elements!';
+    return;
+  }
+
+  // Helper to parse float safely, returning default if NaN
+  const parseFloatOrDefault = (value: string, defaultValue: number): number => {
+      const parsed = parseFloat(value);
+      return isNaN(parsed) ? defaultValue : parsed;
+  };
+
   const options: AutoScrollOptions = {
-    speedMultiplier: parseFloat(speedMultiplierInput.value),
-    baseSpeed: parseFloat(baseSpeedInput.value),
-    minDistance: parseFloat(minDistanceInput.value),
-    maxDistance: parseFloat(maxDistanceInput.value),
-    clickDeadZone: parseFloat(clickDeadZoneInput.value),
-    speedExponent: parseFloat(speedExponentInput.value),
-    debugMode: debugModeCheckbox.checked
+    speedMultiplier: parseFloatOrDefault(speedMultiplierInput.value, defaultOptions.speedMultiplier),
+    baseSpeed:       parseFloatOrDefault(baseSpeedInput.value, defaultOptions.baseSpeed),
+    minDistance:     parseFloatOrDefault(minDistanceInput.value, defaultOptions.minDistance),
+    maxDistance:     parseFloatOrDefault(maxDistanceInput.value, defaultOptions.maxDistance),
+    clickDeadZone:   parseFloatOrDefault(clickDeadZoneInput.value, defaultOptions.clickDeadZone),
+    speedExponent:   parseFloatOrDefault(speedExponentInput.value, defaultOptions.speedExponent),
+    debugMode:       debugModeCheckbox.checked
   };
 
   chrome.storage.sync.set(options, () => {
     // Update status to let user know options were saved
     statusElement.textContent = 'Options saved.';
     setTimeout(() => {
-      statusElement.textContent = '';
+      if (statusElement) statusElement.textContent = ''; // Check existence again
     }, 1500);
   });
 }
 
-// Initialize the options page
+/**
+ * Initializes the options page: loads options and sets up event listeners.
+ */
 function init(): void {
-  // Load saved options
   loadOptions();
 
-  // Add event listeners for value updates
-  speedMultiplierInput.addEventListener('input', () => updateDisplayedValue(speedMultiplierInput, speedMultiplierValue));
-  baseSpeedInput.addEventListener('input', () => updateDisplayedValue(baseSpeedInput, baseSpeedValue));
-  minDistanceInput.addEventListener('input', () => updateDisplayedValue(minDistanceInput, minDistanceValue));
-  maxDistanceInput.addEventListener('input', () => updateDisplayedValue(maxDistanceInput, maxDistanceValue));
-  clickDeadZoneInput.addEventListener('input', () => updateDisplayedValue(clickDeadZoneInput, clickDeadZoneValue));
-  speedExponentInput.addEventListener('input', () => updateDisplayedValue(speedExponentInput, speedExponentValue));
-  
-  // Add save button listener
-  saveButton.addEventListener('click', saveOptions);
+  // Add event listeners only if elements exist
+  speedMultiplierInput?.addEventListener('input', () => updateDisplayedValue(speedMultiplierInput, speedMultiplierValue));
+  baseSpeedInput?.addEventListener('input', () => updateDisplayedValue(baseSpeedInput, baseSpeedValue));
+  minDistanceInput?.addEventListener('input', () => updateDisplayedValue(minDistanceInput, minDistanceValue));
+  maxDistanceInput?.addEventListener('input', () => updateDisplayedValue(maxDistanceInput, maxDistanceValue));
+  clickDeadZoneInput?.addEventListener('input', () => updateDisplayedValue(clickDeadZoneInput, clickDeadZoneValue));
+  speedExponentInput?.addEventListener('input', () => updateDisplayedValue(speedExponentInput, speedExponentValue));
+
+  saveButton?.addEventListener('click', saveOptions);
 }
 
-// Run initialization when DOM is loaded
+// Run initialization when the DOM is fully loaded and parsed.
 document.addEventListener('DOMContentLoaded', init);

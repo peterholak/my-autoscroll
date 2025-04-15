@@ -2,40 +2,51 @@
  * DOM utility functions for the auto-scroll feature
  */
 
-import { scrollConfig } from './config';
+import { getScrollConfig } from './config';
+import { debugLog } from './types';
 
 /**
- * Check if an element is scrollable (has overflow)
+ * Checks if an element is scrollable based on its overflow style and content size.
+ * @param element The HTML element to check.
+ * @returns True if the element is scrollable, false otherwise.
  */
 export function isScrollable(element: HTMLElement): boolean {
+  if (!element) return false;
+  
   const style = window.getComputedStyle(element);
   const overflowX = style.getPropertyValue('overflow-x');
   const overflowY = style.getPropertyValue('overflow-y');
   
-  return (
-    (overflowX === 'auto' || overflowX === 'scroll' || 
-     overflowY === 'auto' || overflowY === 'scroll') &&
-    (element.scrollHeight > element.clientHeight || 
-     element.scrollWidth > element.clientWidth)
-  );
+  const hasScrollableStyle = 
+    overflowX === 'auto' || overflowX === 'scroll' ||
+    overflowY === 'auto' || overflowY === 'scroll';
+    
+  const hasOverflow = 
+    element.scrollHeight > element.clientHeight || 
+    element.scrollWidth > element.clientWidth;
+    
+  return hasScrollableStyle && hasOverflow;
 }
 
 /**
- * Find the innermost scrollable element at a given position
+ * Finds the innermost scrollable element at a specified position on the page.
+ * @param x The X coordinate to check.
+ * @param y The Y coordinate to check.
+ * @returns The innermost scrollable element, or document.scrollingElement as fallback.
  */
 export function findScrollableElementAtPosition(x: number, y: number): HTMLElement | null {
   // Get the element at the position
   const element = document.elementFromPoint(x, y) as HTMLElement;
   if (!element) {
-    console.log('DOM Utils: No element found at position', x, y);
+    debugLog('No element found at position', x, y);
     return null;
   }
   
-  console.log('DOM Utils: Element at position:', element.tagName, element.className);
+  debugLog('Element at position:', element.tagName, element.className);
   
   // First, check if the element itself is scrollable
   if (element !== document.documentElement && element !== document.body && isScrollable(element)) {
-    console.log('DOM Utils: Element itself is scrollable');
+    debugLog('Element itself is scrollable');
     return element;
   }
   
@@ -51,24 +62,28 @@ export function findScrollableElementAtPosition(x: number, y: number): HTMLEleme
     currentElement = currentElement.parentElement;
   }
   
-  console.log('DOM Utils: Found', scrollableAncestors.length, 'scrollable ancestors');
+  debugLog('Found', scrollableAncestors.length, 'scrollable ancestors');
   
   // If we found scrollable ancestors, return the innermost one (first in the array)
   if (scrollableAncestors.length > 0) {
-    console.log('DOM Utils: Using innermost scrollable ancestor:', 
-                scrollableAncestors[0].tagName, scrollableAncestors[0].className);
+    debugLog('Using innermost scrollable ancestor:', 
+              scrollableAncestors[0].tagName, scrollableAncestors[0].className);
     return scrollableAncestors[0];
   }
   
   // If no scrollable element is found, use the document for scrolling
-  console.log('DOM Utils: No scrollable elements found, using document');
+  debugLog('No scrollable elements found, using document');
   return document.scrollingElement as HTMLElement || document.documentElement;
 }
 
 /**
- * Get all scrollable parent elements in order from innermost to outermost
+ * Gets all scrollable parent elements of the specified element, from innermost to outermost.
+ * @param element The element to find scrollable parents for.
+ * @returns Array of scrollable elements, always including document.scrollingElement as fallback.
  */
 export function getScrollableParents(element: HTMLElement): HTMLElement[] {
+  if (!element) return [document.scrollingElement as HTMLElement || document.documentElement];
+  
   const scrollableParents: HTMLElement[] = [];
   
   // Check if the element itself is scrollable
@@ -95,15 +110,21 @@ export function getScrollableParents(element: HTMLElement): HTMLElement[] {
 }
 
 /**
- * Calculate scroll direction and speed based on mouse position relative to the circle
+ * Calculates the scroll direction and speed based on mouse position relative to the center point.
+ * @param mouseX The current mouse X coordinate.
+ * @param mouseY The current mouse Y coordinate.
+ * @param circleX The center X coordinate.
+ * @param circleY The center Y coordinate.
+ * @param speedMultiplier The user-configured speed multiplier.
+ * @returns Object with deltaX and deltaY values for scrolling.
  */
-export function calculateScrollVector(
+export async function calculateScrollVector(
   mouseX: number, 
   mouseY: number, 
   circleX: number, 
   circleY: number, 
   speedMultiplier: number
-): { deltaX: number; deltaY: number } {
+): Promise<{ deltaX: number; deltaY: number }> {
   // Calculate distance from circle center
   const deltaX = mouseX - circleX;
   const deltaY = mouseY - circleY;
@@ -111,41 +132,51 @@ export function calculateScrollVector(
   // Calculate distance (used for speed)
   const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
   
-  // Calculate speed based on distance (with a minimum threshold)
-  const minDistance = scrollConfig.minDistance;
-  const maxDistance = scrollConfig.maxDistance;
+  // Get config values
+  const config = await getScrollConfig();
   
-  if (distance < minDistance) {
+  if (distance < config.minDistance) {
     return { deltaX: 0, deltaY: 0 }; // No scrolling when very close to center
   }
   
-  // Normalize the speed between 0 and 1 based on distance
-  const normalizedSpeed = Math.min(
-    (distance - minDistance) / (maxDistance - minDistance), 
+  // Linear normalization of speed between 0 and 1 based on distance
+  const linearNormalizedSpeed = Math.min(
+    (distance - config.minDistance) / (config.maxDistance - config.minDistance), 
     1
   );
   
+  // Apply exponential curve if set in options
+  const normalizedSpeed = Math.pow(linearNormalizedSpeed, config.speedExponent);
+  
   // Apply speed multiplier and direction
-  const baseSpeed = scrollConfig.baseSpeed;
-  const speedX = (deltaX / distance) * normalizedSpeed * baseSpeed * speedMultiplier;
-  const speedY = (deltaY / distance) * normalizedSpeed * baseSpeed * speedMultiplier;
+  const speedX = (deltaX / distance) * normalizedSpeed * config.baseSpeed * speedMultiplier;
+  const speedY = (deltaY / distance) * normalizedSpeed * config.baseSpeed * speedMultiplier;
   
   return { deltaX: speedX, deltaY: speedY };
 }
 
 /**
- * Check if an element can scroll further in a given direction
+ * Checks if an element can scroll further in the specified direction.
+ * @param element The element to check for scrollability.
+ * @param deltaX The horizontal scroll direction and speed.
+ * @param deltaY The vertical scroll direction and speed.
+ * @returns True if the element can scroll further in the specified direction, false otherwise.
  */
 export function canScrollFurther(
   element: HTMLElement, 
   deltaX: number, 
   deltaY: number
 ): boolean {
+  if (!element) return false;
+  
+  // A small buffer to prevent edge-case issues with tiny fractions
+  const TOLERANCE = 1;
+  
   // Check horizontal scrolling
   if (deltaX < 0 && element.scrollLeft > 0) {
     return true; // Can scroll left
   }
-  if (deltaX > 0 && element.scrollLeft + element.clientWidth < element.scrollWidth) {
+  if (deltaX > 0 && element.scrollLeft + element.clientWidth < element.scrollWidth - TOLERANCE) {
     return true; // Can scroll right
   }
   
@@ -153,7 +184,7 @@ export function canScrollFurther(
   if (deltaY < 0 && element.scrollTop > 0) {
     return true; // Can scroll up
   }
-  if (deltaY > 0 && element.scrollTop + element.clientHeight < element.scrollHeight) {
+  if (deltaY > 0 && element.scrollTop + element.clientHeight < element.scrollHeight - TOLERANCE) {
     return true; // Can scroll down
   }
   

@@ -1,34 +1,38 @@
 /**
- * Configuration settings for auto-scroll behavior
+ * Utility function for retrieving auto-scroll configuration settings.
  */
 
 import { AutoScrollOptions, defaultOptions } from './types';
 
-// Get current configuration from storage
+/**
+ * Asynchronously retrieves the current auto-scroll configuration from
+ * chrome.storage.sync, falling back to default values if necessary.
+ * @returns A Promise that resolves with the AutoScrollOptions.
+ */
 export function getScrollConfig(): Promise<AutoScrollOptions> {
-  return new Promise((resolve) => {
-    chrome.storage.sync.get(defaultOptions, (items) => {
-      resolve(items as unknown as AutoScrollOptions);
-    });
+  return new Promise((resolve, reject) => {
+    // Check if chrome.storage is available (might not be in all contexts, e.g., testing)
+    if (chrome.storage && chrome.storage.sync) {
+      chrome.storage.sync.get(defaultOptions, (items) => {
+        // Check for runtime errors during storage access
+        if (chrome.runtime.lastError) {
+          console.error("Error getting scroll config:", chrome.runtime.lastError);
+          // Resolve with defaults even if there was an error, to avoid breaking functionality
+          resolve({ ...defaultOptions }); 
+        } else {
+          // Assume the retrieved items match the structure, cast carefully.
+          // TODO: Add more robust validation if storage corruption is a concern.
+          resolve(items as unknown as AutoScrollOptions);
+        }
+      });
+    } else {
+      // Fallback to default options if chrome.storage.sync is not available
+      console.warn('chrome.storage.sync not available, using default scroll options.');
+      resolve({ ...defaultOptions });
+    }
   });
 }
 
-// Listen for option changes
-chrome.storage.onChanged.addListener((changes) => {
-  // Configuration changes will be picked up by getScrollConfig()
-  // when the next scroll operation occurs
-});
+// No listener needed here, the AutoScroll class handles option updates directly.
 
-export const scrollConfig = {
-  // Base speed in pixels per frame
-  baseSpeed: 25.0,
-  
-  // Minimum distance from center to start scrolling
-  minDistance: 3,
-  
-  // Maximum distance for full speed scrolling
-  maxDistance: 100,
-  
-  // Default speed multiplier
-  defaultSpeedMultiplier: 1.0
-}; 
+// No static config export needed, config is loaded dynamically via getScrollConfig. 

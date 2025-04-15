@@ -14,9 +14,7 @@ import { getScrollConfig } from '../utils/config';
 
 enum AutoScrollState {
   INACTIVE = 'inactive',
-  ACTIVATING = 'activating',  // Middle button down, not yet activated
-  ACTIVE = 'active',          // Auto-scroll is active
-  DEACTIVATING = 'deactivating'  // Transitioning to inactive
+  ACTIVE = 'active',
 }
 
 export class AutoScroll {
@@ -26,7 +24,6 @@ export class AutoScroll {
   private currentScrollElement: HTMLElement | null = null;
   private animationFrameId: number | null = null;
   private options: AutoScrollOptions = defaultOptions;
-  private lastActivationTime: number = 0;
   private mouseDownX: number | null = null;
   private mouseDownY: number | null = null;
   private lastMouseX: number = 0;
