@@ -111,6 +111,8 @@ export function getScrollableParents(element: HTMLElement): HTMLElement[] {
 
 /**
  * Calculates the scroll direction and speed based on mouse position relative to the center point.
+ * Applies minimum distance threshold to each axis independently.
+ * 
  * @param mouseX The current mouse X coordinate.
  * @param mouseY The current mouse Y coordinate.
  * @param circleX The center X coordinate.
@@ -129,14 +131,19 @@ export async function calculateScrollVector(
   const deltaX = mouseX - circleX;
   const deltaY = mouseY - circleY;
   
-  // Calculate distance (used for speed)
+  // Calculate absolute distances for each axis
+  const absDeltaX = Math.abs(deltaX);
+  const absDeltaY = Math.abs(deltaY);
+  
+  // Calculate overall distance (used for speed magnitude)
   const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
   
   // Get config values
   const config = await getScrollConfig();
   
+  // If overall distance is too small, don't scroll at all
   if (distance < config.minDistance) {
-    return { deltaX: 0, deltaY: 0 }; // No scrolling when very close to center
+    return { deltaX: 0, deltaY: 0 };
   }
   
   // Linear normalization of speed between 0 and 1 based on distance
@@ -148,9 +155,22 @@ export async function calculateScrollVector(
   // Apply exponential curve if set in options
   const normalizedSpeed = Math.pow(linearNormalizedSpeed, config.speedExponent);
   
-  // Apply speed multiplier and direction
-  const speedX = (deltaX / distance) * normalizedSpeed * config.baseSpeed * speedMultiplier;
-  const speedY = (deltaY / distance) * normalizedSpeed * config.baseSpeed * speedMultiplier;
+  // Calculate the base speed magnitude  
+  const speedMagnitude = normalizedSpeed * config.baseSpeed * speedMultiplier;
+  
+  // Apply speed in each direction, but only if the specific axis delta exceeds minimum
+  let speedX = 0;
+  let speedY = 0;
+  
+  // Only apply horizontal scrolling if horizontal distance exceeds minimum
+  if (absDeltaX >= config.minDistance) {
+    speedX = (deltaX / distance) * speedMagnitude;
+  }
+  
+  // Only apply vertical scrolling if vertical distance exceeds minimum  
+  if (absDeltaY >= config.minDistance) {
+    speedY = (deltaY / distance) * speedMagnitude;
+  }
   
   return { deltaX: speedX, deltaY: speedY };
 }

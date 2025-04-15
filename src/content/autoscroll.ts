@@ -401,7 +401,7 @@ export class AutoScroll {
         // Only apply scroll if current distance is beyond minimum
         if (currentDistance >= config.minDistance) {
           // Apply scroll using currentDistance for speed calculation
-          this.applyScroll(deltaX, deltaY, currentDistance);
+          this.applyScroll(deltaX, deltaY, currentDistance, config);
         }
         
         // Continue animation
@@ -440,72 +440,82 @@ export class AutoScroll {
   }
   
   /**
-   * Apply scrolling based on calculated deltas and current distance
-   * @param deltaX Horizontal distance from center
-   * @param deltaY Vertical distance from center
-   * @param currentDistance Overall distance from center
+   * Applies scrolling based on calculated deltas, distance, and configuration.
+   * @param deltaX Horizontal distance from center.
+   * @param deltaY Vertical distance from center.
+   * @param currentDistance Overall distance from center.
+   * @param config The current scroll configuration.
    */
-  private async applyScroll(deltaX: number, deltaY: number, currentDistance: number): Promise<void> {
+  private applyScroll(deltaX: number, deltaY: number, currentDistance: number, config: AutoScrollOptions): void {
     if (!this.currentScrollElement || this.state !== AutoScrollState.ACTIVE) return;
-    
-    // Get current configuration, including speedExponent
-    const config = await getScrollConfig();
-    
-    // Calculate absolute distances for axis direction
+
+    // 1. Calculate absolute deltas for each axis
     const absDeltaX = Math.abs(deltaX);
     const absDeltaY = Math.abs(deltaY);
-    
-    // Calculate speeds for each axis independently using currentDistance for magnitude
-    let speedX = 0;
-    let speedY = 0;
-    
-    // Calculate linear normalized speed first
+
+    // 2. Calculate Normalized Speed (0 to 1 based on distance)
     const linearNormalizedSpeed = Math.max(0, Math.min(
       (currentDistance - config.minDistance) / (config.maxDistance - config.minDistance),
       1
     ));
 
-    // Apply the exponential curve
+    // 3. Apply Exponential Curve
     const normalizedSpeed = Math.pow(linearNormalizedSpeed, config.speedExponent);
-    
-    // Calculate speed magnitude
+
+    // 4. Calculate Speed Magnitude (pixels per frame)
     const speedMagnitude = normalizedSpeed * config.baseSpeed * this.options.speedMultiplier;
 
-    // Apply horizontal scroll if needed (direction from deltaX)
-    if (deltaX !== 0) { // Check deltaX directly for direction
-        speedX = (deltaX / currentDistance) * speedMagnitude; // Use currentDistance for ratio
+    // 5. Calculate X and Y Speed Components based on direction and magnitude,
+    //    but only if the individual axis delta exceeds the minimum distance
+    let speedX = 0;
+    let speedY = 0;
+    
+    // Only apply horizontal scrolling if horizontal distance exceeds minimum
+    if (absDeltaX >= config.minDistance && currentDistance > 0) {
+      speedX = (deltaX / currentDistance) * speedMagnitude;
+    }
+    
+    // Only apply vertical scrolling if vertical distance exceeds minimum
+    if (absDeltaY >= config.minDistance && currentDistance > 0) {
+      speedY = (deltaY / currentDistance) * speedMagnitude;
     }
 
-    // Apply vertical scroll if needed (direction from deltaY)
-    if (deltaY !== 0) { // Check deltaY directly for direction
-        speedY = (deltaY / currentDistance) * speedMagnitude; // Use currentDistance for ratio
-    }
-
-    // If we have any scroll to apply
+    // 6. Apply the scroll to the current element or find a scrollable parent
     if (speedX !== 0 || speedY !== 0) {
-      // Try to scroll the current target element
-      if (this.currentScrollElement && this.canScrollFurtherDirect(this.currentScrollElement, speedX, speedY)) {
-        this.currentScrollElement.scrollLeft += speedX;
-        this.currentScrollElement.scrollTop += speedY;
-        debugLog('Scrolling element', 
-                 this.currentScrollElement.tagName, 
-                 'by', speedX.toFixed(2), speedY.toFixed(2));
-        return;
-      }
+      this.applyScrollToElements(speedX, speedY);
+    }
+  }
+
+  /**
+   * Attempts to scroll the current element or its parents
+   * @param speedX Horizontal scroll speed
+   * @param speedY Vertical scroll speed 
+   */
+  private applyScrollToElements(speedX: number, speedY: number): void {
+    // Try to scroll the current target element
+    if (this.currentScrollElement && this.canScrollFurtherDirect(this.currentScrollElement, speedX, speedY)) {
+      this.currentScrollElement.scrollLeft += speedX;
+      this.currentScrollElement.scrollTop += speedY;
+      debugLog('Scrolling element', 
+              this.currentScrollElement.tagName, 
+              'by', speedX.toFixed(2), speedY.toFixed(2));
+      return;
+    }
+    
+    // If we can't scroll the target element further, try its parents
+    for (let i = 0; i < this.scrollableElements.length; i++) {
+      const parent = this.scrollableElements[i];
+      if (parent === this.currentScrollElement) continue; // Skip if it's the same element we just tried
       
-      // If we can't scroll the target element further, try its parents
-      for (let i = 0; i < this.scrollableElements.length; i++) {
-        const parent = this.scrollableElements[i];
-        if (this.canScrollFurtherDirect(parent, speedX, speedY)) {
-          // Switch to this parent
-          debugLog('Switching to parent element:', parent.tagName);
-          this.currentScrollElement = parent;
-          
-          // Apply scroll
-          parent.scrollLeft += speedX;
-          parent.scrollTop += speedY;
-          return;
-        }
+      if (this.canScrollFurtherDirect(parent, speedX, speedY)) {
+        // Switch to this parent
+        debugLog('Switching to parent element:', parent.tagName);
+        this.currentScrollElement = parent;
+        
+        // Apply scroll
+        parent.scrollLeft += speedX;
+        parent.scrollTop += speedY;
+        return;
       }
     }
     
