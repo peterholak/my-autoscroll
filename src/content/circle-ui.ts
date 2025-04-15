@@ -15,6 +15,7 @@ export class AutoScrollCircle {
     this.element = document.createElement('div');
     this.element.className = 'mac-auto-scroll-circle';
     this.setupStyles();
+    this.element.style.display = 'none'; // Ensure circle starts hidden
     
     // Create the overlay element
     this.overlay = document.createElement('div');
