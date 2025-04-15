@@ -3,12 +3,6 @@
  */
 
 import { AutoScrollCircle } from './circle-ui';
-import { 
-  findScrollableElementAtPosition, 
-  getScrollableParents, 
-  calculateScrollVector, 
-  canScrollFurther 
-} from '../utils/dom-utils';
 import { AutoScrollOptions, defaultOptions, debugLog } from '../utils/types';
 import { getScrollConfig } from '../utils/config';
 

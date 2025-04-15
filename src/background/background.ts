@@ -1,4 +1,4 @@
-// Background script for the macOS Auto-Scroll extension
+// Background script for the My Auto-Scroll extension
 // This script is minimal as most functionality is in the content script
 
 import { defaultOptions, debugLog } from '../utils/types';
@@ -6,7 +6,7 @@ import { defaultOptions, debugLog } from '../utils/types';
 // Listen for installation
 chrome.runtime.onInstalled.addListener(() => {
   // Use console.log directly here since this is important installation info
-  console.log('macOS Auto-Scroll extension installed');
+  console.log('My Auto-Scroll extension installed');
   
   // Set default options if not already set
   chrome.storage.sync.get(['speedMultiplier', 'debugMode'], (result) => {

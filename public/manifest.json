@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "macOS Auto-Scroll",
+  "name": "My Auto-Scroll",
   "version": "1.0.0",
-  "description": "Adds Windows-style auto-scroll functionality to macOS browsers",
+  "description": "Adds Windows-style auto-scroll functionality to non-Windows browsers",
   "permissions": ["storage", "activeTab"],
   "background": {
     "service_worker": "background.js"
@@ -33,6 +33,6 @@
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     },
-    "default_title": "macOS Auto-Scroll"
+    "default_title": "My Auto-Scroll"
   }
 }

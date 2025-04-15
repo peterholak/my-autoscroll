@@ -1,5 +1,5 @@
 /**
- * Content script entry point for the macOS Auto-Scroll extension
+ * Content script entry point for the My Auto-Scroll extension
  */
 
 import { AutoScroll } from './autoscroll';

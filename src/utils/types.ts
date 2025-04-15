@@ -54,11 +54,11 @@ export interface AutoScrollOptions {
 export const defaultOptions: AutoScrollOptions = {
   speedMultiplier: 1.0,
   debugMode: false,
-  baseSpeed: 25.0,
-  minDistance: 3,
-  maxDistance: 100,
+  baseSpeed: 45.0,
+  minDistance: 25,
+  maxDistance: 350,
   clickDeadZone: 5,
-  speedExponent: 1.2
+  speedExponent: 1.3
 };
 
 /**
