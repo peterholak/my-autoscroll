@@ -33,6 +33,8 @@ export class AutoScroll {
   private lastMouseY: number = 0;
   private isDragging: boolean = false;
   private lastLinkTarget: HTMLElement | null = null;
+  private circleCenterX: number = 0;
+  private circleCenterY: number = 0;
   
   constructor() {
     this.circle = new AutoScrollCircle();
@@ -147,11 +149,12 @@ export class AutoScroll {
   /**
    * Handle mouse move events to update scroll direction and speed
    */
-  private handleMouseMove(event: MouseEvent): void {
+  private async handleMouseMove(event: MouseEvent): Promise<void> {
     if (this.state === AutoScrollState.ACTIVE) {
-      // Update the last mouse position for scroll calculations
+      // Update the last mouse position for the animation loop
       this.lastMouseX = event.clientX;
       this.lastMouseY = event.clientY;
+      // No distance calculation needed here
       return;
     }
 
@@ -318,16 +321,25 @@ export class AutoScroll {
   private activate(x: number, y: number): void {
     if (this.state === AutoScrollState.ACTIVE) return;
     
-    this.transitionToState(AutoScrollState.ACTIVE);
+    // Cancel any existing animation frame
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
     
-    // Record activation time
-    this.lastActivationTime = Date.now();
-    debugLog('Activation time recorded:', this.lastActivationTime);
+    // Reset all state
+    this.lastMouseX = x;  // Initialize with click position
+    this.lastMouseY = y;  // Initialize with click position
+    this.circleCenterX = x;
+    this.circleCenterY = y;
+    this.currentScrollElement = null;
+    this.scrollableElements = [];
+    this.isDragging = false;
+    this.mouseDownX = null;
+    this.mouseDownY = null;
+    this.lastLinkTarget = null;
     
-    // Show the circle at the click position
-    this.circle.show(x, y);
-    
-    // Find the scrollable element at the click position
+    // Find all scrollable elements and their relationships before activating
     const element = this.findScrollableElementDirect(x, y);
     if (element) {
       this.currentScrollElement = element;
@@ -340,7 +352,11 @@ export class AutoScroll {
       debugLog('No scrollable element found, using document');
     }
     
-    // Start the scroll animation
+    // Show the circle and activate the overlay
+    this.circle.show(x, y);
+    this.transitionToState(AutoScrollState.ACTIVE);
+    
+    // Start the scroll animation but don't apply any scroll yet
     this.startScrollAnimation();
   }
   
@@ -373,34 +389,27 @@ export class AutoScroll {
   private startScrollAnimation(): void {
     debugLog('Starting scroll animation');
     
-    // Store the last mouse position
-    let lastMouseX = 0;
-    let lastMouseY = 0;
-    
-    // Update last mouse position on mouse move
-    const mouseMoveHandler = (e: MouseEvent) => {
-      lastMouseX = e.clientX;
-      lastMouseY = e.clientY;
-    };
-    
-    document.addEventListener('mousemove', mouseMoveHandler);
-    
     // Animation loop
     const animate = () => {
       if (this.state !== AutoScrollState.ACTIVE) {
-        document.removeEventListener('mousemove', mouseMoveHandler);
         return;
       }
       
-      // Calculate scroll direction and speed directly
-      const deltaX = lastMouseX - this.circle.getCenterX();
-      const deltaY = lastMouseY - this.circle.getCenterY();
+      // Calculate scroll direction based on latest mouse position
+      const deltaX = this.lastMouseX - this.circleCenterX;
+      const deltaY = this.lastMouseY - this.circleCenterY;
+      const currentDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
       
-      // Apply scroll with parent fallback
-      this.applyScroll(deltaX, deltaY);
-      
-      // Continue animation
-      this.animationFrameId = requestAnimationFrame(animate);
+      getScrollConfig().then(config => {
+        // Only apply scroll if current distance is beyond minimum
+        if (currentDistance >= config.minDistance) {
+          // Apply scroll using currentDistance for speed calculation
+          this.applyScroll(deltaX, deltaY, currentDistance);
+        }
+        
+        // Continue animation
+        this.animationFrameId = requestAnimationFrame(animate);
+      });
     };
     
     // Start animation
@@ -434,39 +443,47 @@ export class AutoScroll {
   }
   
   /**
-   * Apply scrolling to the current element
-   * Direct implementation from direct-inject.ts
+   * Apply scrolling based on calculated deltas and current distance
+   * @param deltaX Horizontal distance from center
+   * @param deltaY Vertical distance from center
+   * @param currentDistance Overall distance from center
    */
-  private async applyScroll(deltaX: number, deltaY: number): Promise<void> {
+  private async applyScroll(deltaX: number, deltaY: number, currentDistance: number): Promise<void> {
     if (!this.currentScrollElement || this.state !== AutoScrollState.ACTIVE) return;
     
-    // Get current configuration
+    // Get current configuration, including speedExponent
     const config = await getScrollConfig();
     
-    // Calculate absolute distances for each axis
+    // Calculate absolute distances for axis direction
     const absDeltaX = Math.abs(deltaX);
     const absDeltaY = Math.abs(deltaY);
     
-    // Calculate speeds for each axis independently
+    // Calculate speeds for each axis independently using currentDistance for magnitude
     let speedX = 0;
     let speedY = 0;
     
-    // Only apply horizontal scroll if we're beyond minDistance horizontally
-    if (absDeltaX >= config.minDistance) {
-      // Use exponential curve for speed calculation
-      const normalizedDistanceX = (absDeltaX - config.minDistance) / (config.maxDistance - config.minDistance);
-      const exponentialSpeedX = Math.pow(normalizedDistanceX, this.options.speedExponent);
-      speedX = (deltaX / absDeltaX) * exponentialSpeedX * config.baseSpeed * this.options.speedMultiplier;
-    }
+    // Calculate linear normalized speed first
+    const linearNormalizedSpeed = Math.max(0, Math.min(
+      (currentDistance - config.minDistance) / (config.maxDistance - config.minDistance),
+      1
+    ));
+
+    // Apply the exponential curve
+    const normalizedSpeed = Math.pow(linearNormalizedSpeed, config.speedExponent);
     
-    // Only apply vertical scroll if we're beyond minDistance vertically
-    if (absDeltaY >= config.minDistance) {
-      // Use exponential curve for speed calculation
-      const normalizedDistanceY = (absDeltaY - config.minDistance) / (config.maxDistance - config.minDistance);
-      const exponentialSpeedY = Math.pow(normalizedDistanceY, this.options.speedExponent);
-      speedY = (deltaY / absDeltaY) * exponentialSpeedY * config.baseSpeed * this.options.speedMultiplier;
+    // Calculate speed magnitude
+    const speedMagnitude = normalizedSpeed * config.baseSpeed * this.options.speedMultiplier;
+
+    // Apply horizontal scroll if needed (direction from deltaX)
+    if (deltaX !== 0) { // Check deltaX directly for direction
+        speedX = (deltaX / currentDistance) * speedMagnitude; // Use currentDistance for ratio
     }
-    
+
+    // Apply vertical scroll if needed (direction from deltaY)
+    if (deltaY !== 0) { // Check deltaY directly for direction
+        speedY = (deltaY / currentDistance) * speedMagnitude; // Use currentDistance for ratio
+    }
+
     // If we have any scroll to apply
     if (speedX !== 0 || speedY !== 0) {
       // Try to scroll the current target element
