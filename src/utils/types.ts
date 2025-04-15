@@ -9,6 +9,7 @@ export interface AutoScrollOptions {
   minDistance: number;
   maxDistance: number;
   clickDeadZone: number;  // Maximum distance in pixels to consider a click vs drag
+  speedExponent: number;  // Controls how quickly speed increases with distance
 }
 
 export const defaultOptions: AutoScrollOptions = {
@@ -17,7 +18,8 @@ export const defaultOptions: AutoScrollOptions = {
   baseSpeed: 25.0,
   minDistance: 3,
   maxDistance: 100,
-  clickDeadZone: 5  // 5 pixels of movement is considered a click
+  clickDeadZone: 5,  // 5 pixels of movement is considered a click
+  speedExponent: 1.2
 };
 
 // Cache for debug mode to avoid frequent storage access

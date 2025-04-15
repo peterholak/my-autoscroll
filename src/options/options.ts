@@ -14,22 +14,33 @@ const clickDeadZoneValue = document.getElementById('clickDeadZoneValue') as HTML
 const debugModeCheckbox = document.getElementById('debugMode') as HTMLInputElement;
 const saveButton = document.getElementById('saveButton') as HTMLButtonElement;
 const statusElement = document.getElementById('status') as HTMLDivElement;
+const speedExponentInput = document.getElementById('speedExponent') as HTMLInputElement;
+const speedExponentValue = document.getElementById('speedExponentValue') as HTMLDivElement;
+
+// Update displayed value when slider changes
+function updateDisplayedValue(input: HTMLInputElement, valueElement: HTMLDivElement): void {
+  valueElement.textContent = input.value;
+}
 
 // Load saved options
 function loadOptions(): void {
   chrome.storage.sync.get(defaultOptions, (items) => {
-    const options = items as unknown as AutoScrollOptions;
+    const options = items as AutoScrollOptions;
     speedMultiplierInput.value = options.speedMultiplier.toString();
-    speedMultiplierValue.textContent = options.speedMultiplier.toString();
     baseSpeedInput.value = options.baseSpeed.toString();
-    baseSpeedValue.textContent = options.baseSpeed.toString();
     minDistanceInput.value = options.minDistance.toString();
-    minDistanceValue.textContent = options.minDistance.toString();
     maxDistanceInput.value = options.maxDistance.toString();
-    maxDistanceValue.textContent = options.maxDistance.toString();
     clickDeadZoneInput.value = options.clickDeadZone.toString();
-    clickDeadZoneValue.textContent = options.clickDeadZone.toString();
+    speedExponentInput.value = options.speedExponent.toString();
     debugModeCheckbox.checked = options.debugMode;
+    
+    // Update displayed values
+    updateDisplayedValue(speedMultiplierInput, speedMultiplierValue);
+    updateDisplayedValue(baseSpeedInput, baseSpeedValue);
+    updateDisplayedValue(minDistanceInput, minDistanceValue);
+    updateDisplayedValue(maxDistanceInput, maxDistanceValue);
+    updateDisplayedValue(clickDeadZoneInput, clickDeadZoneValue);
+    updateDisplayedValue(speedExponentInput, speedExponentValue);
   });
 }
 
@@ -41,6 +52,7 @@ function saveOptions(): void {
     minDistance: parseFloat(minDistanceInput.value),
     maxDistance: parseFloat(maxDistanceInput.value),
     clickDeadZone: parseFloat(clickDeadZoneInput.value),
+    speedExponent: parseFloat(speedExponentInput.value),
     debugMode: debugModeCheckbox.checked
   };
 
@@ -53,22 +65,20 @@ function saveOptions(): void {
   });
 }
 
-// Update displayed value when slider changes
-function updateDisplayedValue(input: HTMLInputElement, valueElement: HTMLDivElement): void {
-  valueElement.textContent = input.value;
-}
-
 // Initialize the options page
 function init(): void {
   // Load saved options
   loadOptions();
 
-  // Add event listeners
+  // Add event listeners for value updates
   speedMultiplierInput.addEventListener('input', () => updateDisplayedValue(speedMultiplierInput, speedMultiplierValue));
   baseSpeedInput.addEventListener('input', () => updateDisplayedValue(baseSpeedInput, baseSpeedValue));
   minDistanceInput.addEventListener('input', () => updateDisplayedValue(minDistanceInput, minDistanceValue));
   maxDistanceInput.addEventListener('input', () => updateDisplayedValue(maxDistanceInput, maxDistanceValue));
   clickDeadZoneInput.addEventListener('input', () => updateDisplayedValue(clickDeadZoneInput, clickDeadZoneValue));
+  speedExponentInput.addEventListener('input', () => updateDisplayedValue(speedExponentInput, speedExponentValue));
+  
+  // Add save button listener
   saveButton.addEventListener('click', saveOptions);
 }
 

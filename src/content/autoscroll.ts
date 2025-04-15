@@ -453,20 +453,18 @@ export class AutoScroll {
     
     // Only apply horizontal scroll if we're beyond minDistance horizontally
     if (absDeltaX >= config.minDistance) {
-      const normalizedSpeedX = Math.min(
-        (absDeltaX - config.minDistance) / (config.maxDistance - config.minDistance),
-        1
-      );
-      speedX = (deltaX / absDeltaX) * normalizedSpeedX * config.baseSpeed * this.options.speedMultiplier;
+      // Use exponential curve for speed calculation
+      const normalizedDistanceX = (absDeltaX - config.minDistance) / (config.maxDistance - config.minDistance);
+      const exponentialSpeedX = Math.pow(normalizedDistanceX, this.options.speedExponent);
+      speedX = (deltaX / absDeltaX) * exponentialSpeedX * config.baseSpeed * this.options.speedMultiplier;
     }
     
     // Only apply vertical scroll if we're beyond minDistance vertically
     if (absDeltaY >= config.minDistance) {
-      const normalizedSpeedY = Math.min(
-        (absDeltaY - config.minDistance) / (config.maxDistance - config.minDistance),
-        1
-      );
-      speedY = (deltaY / absDeltaY) * normalizedSpeedY * config.baseSpeed * this.options.speedMultiplier;
+      // Use exponential curve for speed calculation
+      const normalizedDistanceY = (absDeltaY - config.minDistance) / (config.maxDistance - config.minDistance);
+      const exponentialSpeedY = Math.pow(normalizedDistanceY, this.options.speedExponent);
+      speedY = (deltaY / absDeltaY) * exponentialSpeedY * config.baseSpeed * this.options.speedMultiplier;
     }
     
     // If we have any scroll to apply
